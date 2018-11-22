@@ -1,0 +1,74 @@
+#!/bin/bash
+
+PRM_ROOT="$HOME/.prm"
+PRM_CONFIG_FILE_PATH="$PRM_ROOT/config.json"
+
+function usage() {
+  cat <<EOM
+prm
+EOM
+}
+
+function require() {
+  command -v "$1" > /dev/null 2>&1 || {
+    echo "Please install $1";
+    exit 4;
+  }
+}
+
+function initialize() {
+  if [ -e "$PRM_CONFIG_FILE_PATH" ]; then
+    mkdir -p "$PRM_ROOT"
+    cat <<EOF > "$PRM_CONFIG_FILE_PATH"
+{
+  "prm": {
+    "directories": [],
+    "files": []
+  }
+}
+EOF
+  fi
+}
+
+function check_if_protected() {
+  for protected in "$1"
+  do
+    if [ $TARGET = "$protected" ]; then
+      echo "This target is protected by prm"
+      exit 1
+    fi
+  done
+}
+
+function rm() {
+  if [ -f "$@" ]; then
+    PROTECTED_FILES=$(cat "$PRM_CONFIG_FILE_PATH" | jq '.prm.files[]')
+    check_if_protected $PROTECTED_FILES
+  elif [ -d "$@" ]; then
+    PROTECTED_DIRS=$(cat "$PRM_CONFIG_FILE_PATH" | jq '.prm.dirs[]')
+    check_if_protected $PROTECTED_DIRS
+  fi
+  unset -f rm
+  rm "$@"
+  export -f rm
+}
+
+[ $# == 0 ] && usage
+
+while [[ $# -gt 0 ]]
+do
+  case "$1" in
+    -i|--init)
+      initialize
+      ;;
+    --override-rm)
+      export -f rm
+      ;;
+    *)
+      usage
+      ;;
+  esac
+  shift
+done
+
+rm
